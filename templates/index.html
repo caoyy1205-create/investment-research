@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AI 投资研究助手</title>
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Inter', -apple-system, sans-serif; background: #fff; color: #111; min-height: 100vh; }
+
+    .header { border-bottom: 1px solid #e5e5e5; padding: 20px 40px; display: flex; align-items: center; gap: 12px; }
+    .header h1 { font-size: 18px; font-weight: 600; }
+    .header .badge { font-size: 11px; background: #111; color: #fff; padding: 2px 8px; border-radius: 100px; }
+
+    .container { max-width: 860px; margin: 0 auto; padding: 40px 24px; }
+
+    .search-box { display: flex; gap: 12px; margin-bottom: 32px; }
+    .search-box input {
+      flex: 1; padding: 12px 16px; font-size: 15px;
+      border: 1px solid #e5e5e5; border-radius: 8px; outline: none;
+    }
+    .search-box input:focus { border-color: #111; }
+    .search-box button {
+      padding: 12px 24px; background: #111; color: #fff;
+      border: none; border-radius: 8px; font-size: 14px; font-weight: 500;
+      cursor: pointer; white-space: nowrap;
+    }
+    .search-box button:disabled { background: #999; cursor: not-allowed; }
+
+    /* Progress */
+    .progress { display: none; margin-bottom: 28px; }
+    .progress.show { display: block; }
+    .progress-title { font-size: 13px; color: #666; margin-bottom: 12px; }
+    .workers { display: flex; flex-wrap: wrap; gap: 8px; }
+    .worker-chip {
+      display: flex; align-items: center; gap: 6px;
+      padding: 5px 12px; border: 1px solid #e5e5e5; border-radius: 100px;
+      font-size: 12px; color: #555;
+    }
+    .worker-chip.running { border-color: #f0a000; color: #a06000; background: #fffbf0; }
+    .worker-chip.done { border-color: #22c55e; color: #16a34a; background: #f0fdf4; }
+    .worker-chip .dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+    .worker-chip.running .dot { animation: pulse 1s infinite; }
+    @keyframes pulse { 0%,100% { opacity:1 } 50% { opacity:0.3 } }
+
+    /* Scores */
+    .scores { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 24px; }
+    .score-item { display: flex; align-items: center; gap: 6px; font-size: 12px; }
+    .score-label { color: #666; }
+    .score-dots { display: flex; gap: 3px; }
+    .score-dot { width: 8px; height: 8px; border-radius: 50%; background: #e5e5e5; }
+    .score-dot.filled { background: #111; }
+    .score-dot.warn { background: #f59e0b; }
+
+    /* Warnings */
+    .warnings { background: #fffbeb; border: 1px solid #fde68a; border-radius: 8px; padding: 12px 16px; margin-bottom: 20px; }
+    .warnings p { font-size: 13px; color: #92400e; }
+
+    /* Report */
+    .report-wrap { border: 1px solid #e5e5e5; border-radius: 10px; padding: 32px; }
+    .report-wrap h1 { font-size: 22px; margin-bottom: 8px; }
+    .report-wrap h2 { font-size: 16px; margin: 24px 0 10px; border-bottom: 1px solid #f0f0f0; padding-bottom: 6px; }
+    .report-wrap h3 { font-size: 14px; margin: 16px 0 8px; }
+    .report-wrap p { font-size: 14px; line-height: 1.7; color: #333; margin-bottom: 10px; }
+    .report-wrap ul, .report-wrap ol { padding-left: 20px; margin-bottom: 10px; }
+    .report-wrap li { font-size: 14px; line-height: 1.7; color: #333; }
+    .report-wrap em { color: #888; font-style: italic; font-size: 12px; }
+    .report-wrap strong { color: #111; }
+    .report-wrap hr { border: none; border-top: 1px solid #f0f0f0; margin: 20px 0; }
+
+    .meta { font-size: 12px; color: #999; margin-bottom: 24px; }
+
+    .completeness-bar { display: flex; align-items: center; gap: 8px; margin-bottom: 20px; }
+    .completeness-bar span { font-size: 12px; color: #666; }
+    .bar-track { flex: 1; height: 4px; background: #f0f0f0; border-radius: 2px; }
+    .bar-fill { height: 100%; background: #111; border-radius: 2px; transition: width 0.5s; }
+
+    .error-box { background: #fef2f2; border: 1px solid #fecaca; border-radius: 8px; padding: 16px; color: #dc2626; font-size: 14px; }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>AI 投资研究助手</h1>
+    <span class="badge">Multi-Agent</span>
+  </div>
+
+  <div class="container">
+    <div class="search-box">
+      <input type="text" id="companyInput" placeholder="输入公司名称，如：美团、Tesla、NVIDIA..." />
+      <button id="searchBtn" onclick="startResearch()">生成报告</button>
+    </div>
+
+    <!-- Progress -->
+    <div class="progress" id="progressArea">
+      <div class="progress-title" id="progressTitle">正在初始化研究任务...</div>
+      <div class="workers" id="workersArea"></div>
+    </div>
+
+    <!-- Scores -->
+    <div class="scores" id="scoresArea" style="display:none"></div>
+
+    <!-- Warnings -->
+    <div class="warnings" id="warningsArea" style="display:none">
+      <p id="warningsText"></p>
+    </div>
+
+    <!-- Report -->
+    <div class="report-wrap" id="reportArea" style="display:none"></div>
+
+    <!-- Error -->
+    <div class="error-box" id="errorArea" style="display:none"></div>
+  </div>
+
+  <script>
+    const WORKER_NAMES = ['FinancialWorker','NewsWorker','CompetitorWorker','SentimentWorker','RiskWorker'];
+    const WORKER_LABELS = {
+      FinancialWorker: '财务数据',
+      NewsWorker: '近期动态',
+      CompetitorWorker: '竞争格局',
+      SentimentWorker: '市场情绪',
+      RiskWorker: '风险评估',
+      MnAWorker: '并购分析',
+      LegalWorker: '法律风险',
+      MarketExpansionWorker: '市场扩张',
+    };
+
+    function setWorkerState(name, state) {
+      const el = document.getElementById('chip_' + name);
+      if (!el) {
+        const chip = document.createElement('div');
+        chip.className = 'worker-chip running';
+        chip.id = 'chip_' + name;
+        chip.innerHTML = `<span class="dot"></span>${WORKER_LABELS[name] || name}`;
+        document.getElementById('workersArea').appendChild(chip);
+      } else {
+        el.className = 'worker-chip ' + state;
+      }
+    }
+
+    function showScores(sections) {
+      const area = document.getElementById('scoresArea');
+      area.style.display = 'flex';
+      area.innerHTML = sections.map(s => {
+        const dots = Array.from({length:5}, (_,i) => {
+          const cls = i < s.quality_score ? (s.has_warning ? 'score-dot filled warn' : 'score-dot filled') : 'score-dot';
+          return `<span class="${cls}"></span>`;
+        }).join('');
+        return `<div class="score-item">
+          <span class="score-label">${WORKER_LABELS[s.worker_name]||s.worker_name}</span>
+          <div class="score-dots">${dots}</div>
+          <span style="font-size:11px;color:#999">${s.quality_score}/5</span>
+        </div>`;
+      }).join('');
+    }
+
+    async function startResearch() {
+      const company = document.getElementById('companyInput').value.trim();
+      if (!company) return;
+
+      // Reset UI
+      document.getElementById('reportArea').style.display = 'none';
+      document.getElementById('errorArea').style.display = 'none';
+      document.getElementById('scoresArea').style.display = 'none';
+      document.getElementById('warningsArea').style.display = 'none';
+      document.getElementById('workersArea').innerHTML = '';
+      document.getElementById('searchBtn').disabled = true;
+      document.getElementById('searchBtn').textContent = '分析中...';
+
+      const progress = document.getElementById('progressArea');
+      progress.classList.add('show');
+      document.getElementById('progressTitle').textContent = `正在分析 "${company}"...`;
+
+      // Show workers as running
+      WORKER_NAMES.forEach(name => setWorkerState(name, 'running'));
+
+      // Simulate progress animation
+      let doneCount = 0;
+      const ticker = setInterval(() => {
+        if (doneCount < WORKER_NAMES.length) {
+          setWorkerState(WORKER_NAMES[doneCount], 'done');
+          doneCount++;
+        }
+      }, 1200);
+
+      try {
+        const res = await fetch('/api/research', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({company})
+        });
+        clearInterval(ticker);
+        WORKER_NAMES.forEach(name => setWorkerState(name, 'done'));
+
+        const data = await res.json();
+
+        if (!res.ok) {
+          document.getElementById('errorArea').style.display = 'block';
+          document.getElementById('errorArea').textContent = '❌ ' + (data.error || '生成失败');
+          return;
+        }
+
+        document.getElementById('progressTitle').textContent = `✓ 报告生成完成 — ${data.completeness}`;
+
+        // Show quality scores
+        if (data.sections && data.sections.length > 0) showScores(data.sections);
+
+        // Show warnings
+        if (data.warnings && data.warnings.length > 0) {
+          document.getElementById('warningsArea').style.display = 'block';
+          document.getElementById('warningsText').textContent = '⚠️ ' + data.warnings.join('；');
+        }
+
+        // Render report
+        const reportArea = document.getElementById('reportArea');
+        reportArea.style.display = 'block';
+        reportArea.innerHTML = marked.parse(data.report);
+
+      } catch (e) {
+        clearInterval(ticker);
+        document.getElementById('errorArea').style.display = 'block';
+        document.getElementById('errorArea').textContent = '❌ 请求失败：' + e.message;
+      } finally {
+        document.getElementById('searchBtn').disabled = false;
+        document.getElementById('searchBtn').textContent = '生成报告';
+      }
+    }
+
+    document.getElementById('companyInput').addEventListener('keydown', e => {
+      if (e.key === 'Enter') startResearch();
+    });
+  </script>
+</body>
+</html>
