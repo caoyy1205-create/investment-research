@@ -3,14 +3,13 @@ import json
 from openai import AsyncOpenAI
 from models.types import WorkerResult
 from tools.search import search
-from dotenv import load_dotenv
 
-load_dotenv()
 
-client = AsyncOpenAI(
-    api_key=os.getenv("QWEN_API_KEY", "sk-placeholder"),
-    base_url="https://dashscope.aliyuncs.com/compatible-mode/v1"
-)
+def get_client():
+    return AsyncOpenAI(
+        api_key=os.getenv("QWEN_API_KEY", "sk-placeholder"),
+        base_url="https://dashscope.aliyuncs.com/compatible-mode/v1"
+    )
 
 
 def is_chinese(text: str) -> bool:
@@ -37,6 +36,7 @@ class BaseWorker:
             sources = [r["url"] for r in results if r.get("url")]
 
             prompt = self.get_analysis_prompt(company, search_text)
+            client = get_client()
             response = await client.chat.completions.create(
                 model="qwen-plus",
                 messages=[

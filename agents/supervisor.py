@@ -10,14 +10,13 @@ from agents.workers import (
 )
 from agents.synthesizer import Synthesizer
 from tools.search import USE_MOCK
-from dotenv import load_dotenv
 
-load_dotenv()
 
-client = AsyncOpenAI(
-    api_key=os.getenv("QWEN_API_KEY", "sk-placeholder"),
-    base_url="https://dashscope.aliyuncs.com/compatible-mode/v1"
-)
+def get_client():
+    return AsyncOpenAI(
+        api_key=os.getenv("QWEN_API_KEY", "sk-placeholder"),
+        base_url="https://dashscope.aliyuncs.com/compatible-mode/v1"
+    )
 
 WORKER_TIMEOUT = 30  # seconds
 QUALITY_THRESHOLD = 3
@@ -98,6 +97,7 @@ class Supervisor:
 {{"score": 4, "reason": "包含具体财务数据，来源可靠，但缺少估值分析"}}"""
 
         try:
+            client = get_client()
             response = await client.chat.completions.create(
                 model="qwen-plus",
                 messages=[{"role": "user", "content": prompt}],
@@ -192,6 +192,7 @@ class Supervisor:
 {{"extra_workers": ["MnAWorker"], "reasons": ["新闻中提到了重大海外收购事件"]}}"""
 
         try:
+            client = get_client()
             response = await client.chat.completions.create(
                 model="qwen-plus",
                 messages=[{"role": "user", "content": prompt}],

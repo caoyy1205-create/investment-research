@@ -3,10 +3,12 @@ from datetime import datetime
 from openai import AsyncOpenAI
 from models.types import WorkerResult, ResearchReport, ReportSection
 
-client = AsyncOpenAI(
-    api_key=os.getenv("QWEN_API_KEY", "sk-placeholder"),
-    base_url="https://dashscope.aliyuncs.com/compatible-mode/v1"
-)
+
+def get_client():
+    return AsyncOpenAI(
+        api_key=os.getenv("QWEN_API_KEY", "sk-placeholder"),
+        base_url="https://dashscope.aliyuncs.com/compatible-mode/v1"
+    )
 
 SECTION_MAP = {
     "FinancialWorker": "财务表现",
@@ -89,6 +91,7 @@ class Synthesizer:
 
 如某维度数据不足，在该章节末尾加⚠️标注并说明局限性。"""
 
+        client = get_client()
         response = await client.chat.completions.create(
             model="qwen-plus",
             messages=[
