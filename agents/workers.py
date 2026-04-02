@@ -3,6 +3,9 @@ import json
 from openai import AsyncOpenAI
 from models.types import WorkerResult
 from tools.search import search
+from dotenv import load_dotenv
+
+load_dotenv()
 
 client = AsyncOpenAI(
     api_key=os.getenv("QWEN_API_KEY", "sk-placeholder"),
@@ -51,6 +54,7 @@ class BaseWorker:
                 sources=sources
             )
         except Exception as e:
+            print(f"  [ERROR] {self.name} failed: {type(e).__name__}: {e}")
             return WorkerResult(
                 worker_name=self.name,
                 status="ERROR",

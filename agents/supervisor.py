@@ -10,6 +10,9 @@ from agents.workers import (
 )
 from agents.synthesizer import Synthesizer
 from tools.search import USE_MOCK
+from dotenv import load_dotenv
+
+load_dotenv()
 
 client = AsyncOpenAI(
     api_key=os.getenv("QWEN_API_KEY", "sk-placeholder"),
