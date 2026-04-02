@@ -9,6 +9,7 @@ from agents.workers import (
     SentimentWorker, RiskWorker, EXTRA_WORKER_MAP
 )
 from agents.synthesizer import Synthesizer
+from tools.search import USE_MOCK
 
 client = AsyncOpenAI(
     api_key=os.getenv("QWEN_API_KEY", "sk-placeholder"),
@@ -71,6 +72,12 @@ class Supervisor:
         if result.status != "SUCCESS":
             result.quality_score = 0
             result.quality_reason = f"Worker未成功执行（状态：{result.status}）"
+            return result
+
+        # Mock模式下跳过LLM质量评估，直接给4分
+        if USE_MOCK:
+            result.quality_score = 4
+            result.quality_reason = "Mock模式，默认评分4/5"
             return result
 
         prompt = f"""请评估以下投资研究内容的质量。
