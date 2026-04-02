@@ -3,8 +3,10 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-TAVILY_API_KEY = os.getenv("TAVILY_API_KEY", "tvly-xxx")
-USE_MOCK = not TAVILY_API_KEY or TAVILY_API_KEY == "tvly-xxx"
+# Use DuckDuckGo by default (free, no API key needed)
+# Falls back to mock mode if ddgs is not installed or search fails
+USE_MOCK = os.getenv("USE_MOCK", "false").lower() == "true"
+
 
 # Mock data: realistic-looking search results for common companies
 MOCK_DATA = {
@@ -82,7 +84,7 @@ MOCK_DATA = {
         "default": """
 主要风险因素：
 1. 宏观经济下行压力影响消费需求
-2. 行业竞争加剧导致获客成本上升
+2. 行业竞争加剧导致获客成本约上升
 3. 监管政策不确定性
 4. 核心管理团队稳定性风险
 5. 汇率波动风险（如有海外业务）
@@ -98,7 +100,7 @@ def _get_mock_data(company: str, search_type: str) -> list:
     return [
         {
             "title": f"{company} {search_type} 分析",
-            "url": f"https://example.com/{search_type}",
+            "url": f"https://finance.yahoo.com/search?q={company}",
             "content": content.strip()
         }
     ]
@@ -106,26 +108,33 @@ def _get_mock_data(company: str, search_type: str) -> list:
 
 async def search(query: str, search_type: str = "general", company: str = "") -> list:
     """
-    Search for information. Uses mock data if TAVILY_API_KEY is not set.
+    Search for information using DuckDuckGo (free, no API key needed).
+    Falls back to mock data if USE_MOCK=true or if search fails.
     Returns list of {title, url, content} dicts.
     """
     if USE_MOCK:
         print(f"  [MOCK] Searching: {query}")
         return _get_mock_data(company or query, search_type)
 
-    # Real Tavily search
+    # Real DuckDuckGo search
     try:
-        from tavily import TavilyClient
-        client = TavilyClient(api_key=TAVILY_API_KEY)
-        response = client.search(query, max_results=5)
-        return [
-            {
-                "title": r.get("title", ""),
-                "url": r.get("url", ""),
-                "content": r.get("content", "")
-            }
-            for r in response.get("results", [])
-        ]
+        from ddgs import DDGS
+        print(f"  [DDG] Searching: {query}")
+        results = []
+        with DDGS() as ddgs:
+            for r in ddgs.text(query, max_results=5):
+                results.append({
+                    "title": r.get("title", ""),
+                    "url": r.get("href", ""),
+                    "content": r.get("body", "")
+                })
+        if results:
+            return results
+        print(f"  [DDG] No results, falling back to mock")
+        return _get_mock_data(company or query, search_type)
+    except ImportError:
+        print(f"  [WARN] ddgs not installed, falling back to mock. Run: pip install ddgs")
+        return _get_mock_data(company or query, search_type)
     except Exception as e:
-        print(f"  [ERROR] Tavily search failed: {e}")
-        return []
+        print(f"  [WARN] DDG search failed: {e}, falling back to mock")
+        return _get_mock_data(company or query, search_type)
